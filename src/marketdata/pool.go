@@ -30,8 +30,8 @@ type PoolDayRangeStats struct {
 }
 
 // Iteratively fetches all pools with fee data in date range.
-func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]*Pool, error) {
-	log.Printf("Fetching all liquidity pools and date range data from %v to %v", dateRangeStart, dateRangeEnd)
+func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl float64) ([]*Pool, error) {
+	log.Printf("Fetching all liquidity pools and date range data from %v to %v where date TVL is at least %f", dateRangeStart, dateRangeEnd, minTvl)
 
 	var res struct {
 		Pools []struct {
@@ -80,6 +80,8 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]*Pool, e
 				Length: len(resPool.PoolDays),
 			}
 
+			exceedsMinTvl := false
+
 			for _, resPoolDay := range resPool.PoolDays {
 				feesUsd, err := strconv.ParseFloat(string(resPoolDay.FeesUsd), 64)
 				if err != nil {
@@ -91,28 +93,37 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]*Pool, e
 					return nil, fmt.Errorf(CouldNotParseErrMsg, "tvl USD", err)
 				}
 
+				// Check if the TVL on this date exceeds minimum.
+				if !exceedsMinTvl && tvlUsd > minTvl {
+					exceedsMinTvl = true
+				}
+
 				poolDayRangeStats.SumFees += feesUsd
 				poolDayRangeStats.SumTotalValueLocked += tvlUsd
 			}
 
-			if poolDayRangeStats.SumTotalValueLocked != 0 {
-				poolDayRangeStats.ProfitOverRange = poolDayRangeStats.SumFees / poolDayRangeStats.SumTotalValueLocked
+			// Verify that on some date in the range, the min TVL was exceeded.
+			// Ignore pools where the min TVL was never exceeded in the provided date range.
+			if exceedsMinTvl {
+				if poolDayRangeStats.SumTotalValueLocked != 0 {
+					poolDayRangeStats.ProfitOverRange = poolDayRangeStats.SumFees / poolDayRangeStats.SumTotalValueLocked
 
-				if poolDayRangeStats.Length > 0 {
-					poolDayRangeStats.ProfitAnnualized = (poolDayRangeStats.ProfitOverRange / float64(poolDayRangeStats.Length)) * 365
+					if poolDayRangeStats.Length > 0 {
+						poolDayRangeStats.ProfitAnnualized = (poolDayRangeStats.ProfitOverRange / float64(poolDayRangeStats.Length)) * 365
+					}
 				}
-			}
 
-			pools = append(
-				pools,
-				&Pool{
-					Id:                  string(resPool.Id),
-					TotalValueLockedUsd: totalValueLockedUsd,
-					Token0Name:          string(resPool.Token0.Name),
-					Token1Name:          string(resPool.Token1.Name),
-					DayRangeStats:       poolDayRangeStats,
-				},
-			)
+				pools = append(
+					pools,
+					&Pool{
+						Id:                  string(resPool.Id),
+						TotalValueLockedUsd: totalValueLockedUsd,
+						Token0Name:          string(resPool.Token0.Name),
+						Token1Name:          string(resPool.Token1.Name),
+						DayRangeStats:       poolDayRangeStats,
+					},
+				)
+			}
 		}
 
 		if len(res.Pools) > 0 {

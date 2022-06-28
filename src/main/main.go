@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/jaksonkallio/coding-challenge-messari/src/marketdata"
 )
@@ -22,7 +23,12 @@ func main() {
 		log.Fatalf("Date range start is after date range end")
 	}
 
-	pools, err := marketdata.FetchAllPools(dateRangeStart, dateRangeEnd)
+	minTvl, err := strconv.ParseFloat(string(os.Args[3]), 64)
+	if err != nil {
+		log.Fatalf("Bad min TVL: %s", err)
+	}
+
+	pools, err := marketdata.FetchAllPools(dateRangeStart, dateRangeEnd, minTvl)
 	if err != nil {
 		log.Fatalf("Could not fetch pools: %s", err)
 	}
