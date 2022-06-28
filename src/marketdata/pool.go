@@ -97,10 +97,10 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]*Pool, e
 
 			if poolDayRangeStats.SumTotalValueLocked != 0 {
 				poolDayRangeStats.ProfitOverRange = poolDayRangeStats.SumFees / poolDayRangeStats.SumTotalValueLocked
-			}
 
-			if poolDayRangeStats.Length > 0 {
-				poolDayRangeStats.ProfitAnnualized = (poolDayRangeStats.ProfitOverRange / float64(poolDayRangeStats.Length)) * 365
+				if poolDayRangeStats.Length > 0 {
+					poolDayRangeStats.ProfitAnnualized = (poolDayRangeStats.ProfitOverRange / float64(poolDayRangeStats.Length)) * 365
+				}
 			}
 
 			pools = append(
