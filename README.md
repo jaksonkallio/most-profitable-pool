@@ -13,19 +13,19 @@ There are three command line arguments:
 ### Example
 For example, `./dist/most-profitable-pool 2022-01-01 2022-02-28 100000` will return:
 ```
-2022/06/28 13:56:23 Fetching all liquidity pools and date range data from 2022-01-01 00:00:00 +0000 UTC to 2022-02-28 00:00:00 +0000 UTC where date TVL is at least 100000.000000
-2022/06/28 13:56:29 Fetched 1000 pools
-2022/06/28 13:56:34 Fetched 1000 pools
-2022/06/28 13:56:40 Fetched 1000 pools
-2022/06/28 13:56:44 Fetched 1000 pools
-2022/06/28 13:56:47 Fetched 1000 pools
-2022/06/28 13:56:51 Fetched 1000 pools
-2022/06/28 13:56:55 Fetched 1000 pools
-2022/06/28 13:56:56 Fetched 130 pools
-2022/06/28 13:56:56 Most profitable pool:
+2022/06/28 14:28:24 Fetching all liquidity pools and date range data from 2022-01-01 00:00:00 +0000 UTC to 2022-02-28 00:00:00 +0000 UTC where date TVL is at least 100000.000000
+2022/06/28 14:28:26 Fetched 1000 pools
+2022/06/28 14:28:29 Fetched 1000 pools
+2022/06/28 14:28:31 Fetched 1000 pools
+2022/06/28 14:28:38 Fetched 1000 pools
+2022/06/28 14:28:41 Fetched 1000 pools
+2022/06/28 14:28:43 Fetched 1000 pools
+2022/06/28 14:28:46 Fetched 1000 pools
+2022/06/28 14:28:46 Fetched 131 pools
+2022/06/28 14:28:46 Most profitable pool:
 	Pool Address: 0x63805e5d951398bc1c1bec242d303f59fa7732e3
 	Tokens: X2Y2Token <-> Wrapped Ether
 	Range Length: 13
-	Profit Rate Over Range: 7.42%
+	Profit Over Range (Earned per $1 USD Deposited): 0.074239
 	Profit Annualized (APR): 208.44%
 ```
