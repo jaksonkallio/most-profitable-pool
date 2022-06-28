@@ -10,18 +10,22 @@ import (
 	"github.com/shurcooL/graphql"
 )
 
+// How many pools to get with each API call.
 const FetchBatchCount int = 1000
 const CouldNotParseErrMsg string = "could not parse %s value: %s"
 
+// Representation of a particular pool with stats calculated from a date range.
 type Pool struct {
-	Id                  string
-	TotalValueLockedUsd float64
-	Token0Name          string
-	Token1Name          string
-	DayRangeStats       PoolDayRangeStats
+	Id            string
+	Token0Name    string
+	Token1Name    string
+	DayRangeStats PoolDayRangeStats
 }
 
+// Pool stats over a specified date range.
 type PoolDayRangeStats struct {
+	StartDate           time.Time
+	EndDate             time.Time
 	SumTotalValueLocked float64
 	SumFees             float64
 	ProfitOverRange     float64
@@ -35,9 +39,8 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl floa
 
 	var res struct {
 		Pools []struct {
-			Id                  graphql.String `graphql:"id"`
-			TotalValueLockedUsd graphql.String `graphql:"totalValueLockedUSD"`
-			Token0              struct {
+			Id     graphql.String `graphql:"id"`
+			Token0 struct {
 				Name graphql.String `graphql:"name"`
 			} `graphql:"token0"`
 			Token1 struct {
@@ -55,7 +58,7 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl floa
 	lastId := ""
 	pools := make([]*Pool, 0)
 
-	for page == 0 || len(lastId) > 0 {
+	for {
 		err := GraphQuery(
 			&res,
 			map[string]interface{}{
@@ -69,25 +72,25 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl floa
 			return nil, fmt.Errorf("could not get pools: %s", err)
 		}
 
-		// TODO: more efficient way of appending to resulting pools slice.
 		for _, resPool := range res.Pools {
-			totalValueLockedUsd, err := strconv.ParseFloat(string(resPool.TotalValueLockedUsd), 64)
-			if err != nil {
-				return nil, fmt.Errorf(CouldNotParseErrMsg, "total value locked USD", err)
-			}
-
+			// Init a range stats object.
 			poolDayRangeStats := PoolDayRangeStats{
-				Length: len(resPool.PoolDays),
+				Length:    len(resPool.PoolDays),
+				StartDate: dateRangeStart,
+				EndDate:   dateRangeEnd,
 			}
 
 			exceedsMinTvl := false
 
+			// Iterate over each pool day.
 			for _, resPoolDay := range resPool.PoolDays {
+				// Parse the day's fees represented in USD.
 				feesUsd, err := strconv.ParseFloat(string(resPoolDay.FeesUsd), 64)
 				if err != nil {
 					return nil, fmt.Errorf(CouldNotParseErrMsg, "fees USD", err)
 				}
 
+				// Parse the day's TVL represented in USD.
 				tvlUsd, err := strconv.ParseFloat(string(resPoolDay.TvlUsd), 64)
 				if err != nil {
 					return nil, fmt.Errorf(CouldNotParseErrMsg, "tvl USD", err)
@@ -98,6 +101,7 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl floa
 					exceedsMinTvl = true
 				}
 
+				// Add to our sums.
 				poolDayRangeStats.SumFees += feesUsd
 				poolDayRangeStats.SumTotalValueLocked += tvlUsd
 			}
@@ -113,14 +117,14 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl floa
 					}
 				}
 
+				// Add new pool to the resulting pools slice.
 				pools = append(
 					pools,
 					&Pool{
-						Id:                  string(resPool.Id),
-						TotalValueLockedUsd: totalValueLockedUsd,
-						Token0Name:          string(resPool.Token0.Name),
-						Token1Name:          string(resPool.Token1.Name),
-						DayRangeStats:       poolDayRangeStats,
+						Id:            string(resPool.Id),
+						Token0Name:    string(resPool.Token0.Name),
+						Token1Name:    string(resPool.Token1.Name),
+						DayRangeStats: poolDayRangeStats,
 					},
 				)
 			}
@@ -130,9 +134,11 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl floa
 			lastId = string(res.Pools[len(res.Pools)-1].Id)
 			log.Printf("Fetched %d pools", len(res.Pools))
 		} else {
-			lastId = ""
+			// Break once we no longer receive any pools from our query.
+			break
 		}
 
+		// Increment page counter.
 		page += 1
 	}
 
