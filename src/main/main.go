@@ -2,17 +2,18 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/jaksonkallio/coding-challenge-messari/src/marketdata"
 )
 
 func main() {
-	dateRangeStart, err := marketdata.ParseDate("2022-01-01")
+	dateRangeStart, err := marketdata.ParseDate(os.Args[1])
 	if err != nil {
 		log.Fatalf("Bad range start date: %s", err)
 	}
 
-	dateRangeEnd, err := marketdata.ParseDate("2022-02-28")
+	dateRangeEnd, err := marketdata.ParseDate(os.Args[2])
 	if err != nil {
 		log.Fatalf("Bad range end date: %s", err)
 	}
