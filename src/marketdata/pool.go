@@ -163,7 +163,7 @@ func MostProfitablePool(pools []*Pool) *Pool {
 // Pretty-prints the pool by returning a string.
 func (pool *Pool) Pretty() string {
 	return fmt.Sprintf(
-		"\n\tPool Address: %s\n\tTokens: %s <-> %s\n\tRange Length: %d\n\tProfit Over Range (Earned per $1 USD Deposited): %.2f%%\n\tProfit Annualized (APR): %.2f%%",
+		"\n\tPool Address: %s\n\tTokens: %s <-> %s\n\tRange Length: %d\n\tProfit Over Range (Earned per $1 USD Deposited): %f\n\tProfit Annualized (APR): %.2f%%",
 		pool.Id,
 		pool.Token0Name,
 		pool.Token1Name,
