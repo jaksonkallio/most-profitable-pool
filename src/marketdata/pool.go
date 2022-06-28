@@ -2,7 +2,6 @@ package marketdata
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"time"
@@ -10,7 +9,7 @@ import (
 	"github.com/shurcooL/graphql"
 )
 
-const FetchBatchCount int = 10
+const FetchBatchCount int = 1000
 const CouldNotParseErrMsg string = "could not parse %s value: %s"
 
 type Pool struct {
@@ -28,11 +27,11 @@ type PoolDay struct {
 }
 
 type DayRangeStats struct {
-	Volume           float64
-	Fees             float64
-	ProfitOverRange  float64
-	ProfitAnnualized float64
-	Length           int
+	SumTotalValueLocked float64
+	SumFees             float64
+	ProfitOverRange     float64
+	ProfitAnnualized    float64
+	Length              int
 }
 
 // Iteratively fetches all pools with fee data in date range.
@@ -52,8 +51,7 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]Pool, er
 				TvlUsd  graphql.String `graphql:"tvlUSD"`
 				Date    graphql.Int    `graphql:"date"`
 			} `graphql:"poolDayData(where: { date_gte: $dateRangeStart, date_lte: $dateRangeEnd })"`
-			// TODO: revert this by removing orderBy volume and orderDirection
-		} `graphql:"pools(first: $count, where: { id_gt: $lastId }, orderBy: volumeUSD, orderDirection:desc )"`
+		} `graphql:"pools(first: $count, where: { id_gt: $lastId } )"`
 	}
 
 	page := 0
@@ -117,16 +115,12 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]Pool, er
 		}
 
 		if len(res.Pools) > 0 {
-			log.Printf("Fetched %d pools", len(res.Pools))
 			lastId = string(res.Pools[len(res.Pools)-1].Id)
 		} else {
 			lastId = ""
 		}
 
 		page += 1
-
-		// TODO: remove
-		break
 	}
 
 	return pools, nil
@@ -138,13 +132,12 @@ func (pool *Pool) DayRangeStats() DayRangeStats {
 	}
 
 	for _, day := range pool.Days {
-		dayRangeStats.Volume += day.TvlUsd
-		dayRangeStats.Fees += day.FeesUsd
+		dayRangeStats.SumTotalValueLocked += day.TvlUsd
+		dayRangeStats.SumFees += day.FeesUsd
 	}
 
-	// TODO: fix this calculation... I'm pretty sure its wrong
-	if dayRangeStats.Volume != 0 {
-		dayRangeStats.ProfitOverRange = dayRangeStats.Fees / dayRangeStats.Volume
+	if dayRangeStats.SumTotalValueLocked != 0 {
+		dayRangeStats.ProfitOverRange = dayRangeStats.SumFees / dayRangeStats.SumTotalValueLocked
 	}
 
 	if dayRangeStats.Length > 0 {
