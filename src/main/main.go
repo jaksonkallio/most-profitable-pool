@@ -7,27 +7,29 @@ import (
 )
 
 func main() {
-	// TODO: remove all this stuff in the main function, currently exists for testing connection to UniSwap subgraph.
+	dateRangeStart, err := marketdata.ParseDate("2022-01-01")
+	if err != nil {
+		log.Fatalf("Bad range start date: %s", err)
+	}
 
-	/*
-		dateRangeStart, _ := marketdata.ParseDate("2022-01-01")
-		dateRangeEnd, _ := marketdata.ParseDate("2022-02-28")
-	*/
+	dateRangeEnd, err := marketdata.ParseDate("2022-02-28")
+	if err != nil {
+		log.Fatalf("Bad range end date: %s", err)
+	}
 
-	dateRangeStart, _ := marketdata.ParseDate("2022-05-27")
-	dateRangeEnd, _ := marketdata.ParseDate("2022-06-27")
+	if dateRangeStart.After(dateRangeEnd) {
+		log.Fatalf("Date range start is after date range end")
+	}
 
 	pools, err := marketdata.FetchAllPools(dateRangeStart, dateRangeEnd)
 	if err != nil {
-		log.Fatalf("could not fetch pools: %s", err)
+		log.Fatalf("Could not fetch pools: %s", err)
 	}
 
-	for _, pool := range pools {
-		log.Println(pool.Pretty())
-
-		/*if i >= 20 {
-			log.Printf("%d additional pools omitted from display", len(pools)-i)
-			break
-		}*/
+	mostProfitablePool := marketdata.MostProfitablePool(pools)
+	if mostProfitablePool == nil {
+		log.Printf("No pool is considered most profitable")
+	} else {
+		log.Printf("Most profitable pool: %s", mostProfitablePool.Pretty())
 	}
 }

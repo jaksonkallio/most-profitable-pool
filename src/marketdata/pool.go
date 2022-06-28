@@ -2,6 +2,7 @@ package marketdata
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"time"
@@ -17,16 +18,10 @@ type Pool struct {
 	TotalValueLockedUsd float64
 	Token0Name          string
 	Token1Name          string
-	Days                []PoolDay
+	DayRangeStats       PoolDayRangeStats
 }
 
-type PoolDay struct {
-	Date    time.Time
-	FeesUsd float64
-	TvlUsd  float64
-}
-
-type DayRangeStats struct {
+type PoolDayRangeStats struct {
 	SumTotalValueLocked float64
 	SumFees             float64
 	ProfitOverRange     float64
@@ -35,7 +30,9 @@ type DayRangeStats struct {
 }
 
 // Iteratively fetches all pools with fee data in date range.
-func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]Pool, error) {
+func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]*Pool, error) {
+	log.Printf("Fetching all liquidity pools and date range data from %v to %v", dateRangeStart, dateRangeEnd)
+
 	var res struct {
 		Pools []struct {
 			Id                  graphql.String `graphql:"id"`
@@ -56,7 +53,7 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]Pool, er
 
 	page := 0
 	lastId := ""
-	pools := make([]Pool, 0)
+	pools := make([]*Pool, 0)
 
 	for page == 0 || len(lastId) > 0 {
 		err := GraphQuery(
@@ -79,7 +76,9 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]Pool, er
 				return nil, fmt.Errorf(CouldNotParseErrMsg, "total value locked USD", err)
 			}
 
-			poolDays := make([]PoolDay, 0)
+			poolDayRangeStats := PoolDayRangeStats{
+				Length: len(resPool.PoolDays),
+			}
 
 			for _, resPoolDay := range resPool.PoolDays {
 				feesUsd, err := strconv.ParseFloat(string(resPoolDay.FeesUsd), 64)
@@ -92,30 +91,33 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]Pool, er
 					return nil, fmt.Errorf(CouldNotParseErrMsg, "tvl USD", err)
 				}
 
-				poolDays = append(
-					poolDays,
-					PoolDay{
-						FeesUsd: feesUsd,
-						TvlUsd:  tvlUsd,
-						Date:    time.Unix(int64(resPoolDay.Date), 0),
-					},
-				)
+				poolDayRangeStats.SumFees += feesUsd
+				poolDayRangeStats.SumTotalValueLocked += tvlUsd
+			}
+
+			if poolDayRangeStats.SumTotalValueLocked != 0 {
+				poolDayRangeStats.ProfitOverRange = poolDayRangeStats.SumFees / poolDayRangeStats.SumTotalValueLocked
+			}
+
+			if poolDayRangeStats.Length > 0 {
+				poolDayRangeStats.ProfitAnnualized = (poolDayRangeStats.ProfitOverRange / float64(poolDayRangeStats.Length)) * 365
 			}
 
 			pools = append(
 				pools,
-				Pool{
+				&Pool{
 					Id:                  string(resPool.Id),
 					TotalValueLockedUsd: totalValueLockedUsd,
 					Token0Name:          string(resPool.Token0.Name),
 					Token1Name:          string(resPool.Token1.Name),
-					Days:                poolDays,
+					DayRangeStats:       poolDayRangeStats,
 				},
 			)
 		}
 
 		if len(res.Pools) > 0 {
 			lastId = string(res.Pools[len(res.Pools)-1].Id)
+			log.Printf("Fetched %d pools", len(res.Pools))
 		} else {
 			lastId = ""
 		}
@@ -126,37 +128,29 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time) ([]Pool, er
 	return pools, nil
 }
 
-func (pool *Pool) DayRangeStats() DayRangeStats {
-	dayRangeStats := DayRangeStats{
-		Length: len(pool.Days),
+// Finds the most profitable pool, given a slice of pools.
+// If two pools are equally profitable, chooses the one that comes earlier.
+func MostProfitablePool(pools []*Pool) *Pool {
+	var mostProfitablePool *Pool
+
+	for _, pool := range pools {
+		if mostProfitablePool == nil || pool.DayRangeStats.ProfitOverRange > mostProfitablePool.DayRangeStats.ProfitOverRange {
+			mostProfitablePool = pool
+		}
 	}
 
-	for _, day := range pool.Days {
-		dayRangeStats.SumTotalValueLocked += day.TvlUsd
-		dayRangeStats.SumFees += day.FeesUsd
-	}
-
-	if dayRangeStats.SumTotalValueLocked != 0 {
-		dayRangeStats.ProfitOverRange = dayRangeStats.SumFees / dayRangeStats.SumTotalValueLocked
-	}
-
-	if dayRangeStats.Length > 0 {
-		dayRangeStats.ProfitAnnualized = (dayRangeStats.ProfitOverRange / float64(dayRangeStats.Length)) * 365
-	}
-
-	return dayRangeStats
+	return mostProfitablePool
 }
 
+// Pretty-prints the pool by returning a string.
 func (pool *Pool) Pretty() string {
-	dayRangeStats := pool.DayRangeStats()
-
 	return fmt.Sprintf(
-		"Pool %s / %s\n\tID: %s\n\tRange Length: %d\n\tProfit Rate Over Range: %.2f%%\n\tProfit Annualized (APR): %.2f%%",
+		"\n\tPool Address: %s\n\tTokens: %s <-> %s\n\tRange Length: %d\n\tProfit Rate Over Range: %.2f%%\n\tProfit Annualized (APR): %.2f%%",
+		pool.Id,
 		pool.Token0Name,
 		pool.Token1Name,
-		pool.Id,
-		dayRangeStats.Length,
-		math.Round(dayRangeStats.ProfitOverRange*10000)/float64(100),
-		math.Round(dayRangeStats.ProfitAnnualized*10000)/float64(100),
+		pool.DayRangeStats.Length,
+		math.Round(pool.DayRangeStats.ProfitOverRange*10000)/float64(100),
+		math.Round(pool.DayRangeStats.ProfitAnnualized*10000)/float64(100),
 	)
 }
