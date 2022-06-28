@@ -113,6 +113,7 @@ func FetchAllPools(dateRangeStart time.Time, dateRangeEnd time.Time, minTvl floa
 					poolDayRangeStats.ProfitOverRange = poolDayRangeStats.SumFees / poolDayRangeStats.SumTotalValueLocked
 
 					if poolDayRangeStats.Length > 0 {
+						// Annualized profit assumes there are exactly 365 days in a year.
 						poolDayRangeStats.ProfitAnnualized = (poolDayRangeStats.ProfitOverRange / float64(poolDayRangeStats.Length)) * 365
 					}
 				}
@@ -162,12 +163,12 @@ func MostProfitablePool(pools []*Pool) *Pool {
 // Pretty-prints the pool by returning a string.
 func (pool *Pool) Pretty() string {
 	return fmt.Sprintf(
-		"\n\tPool Address: %s\n\tTokens: %s <-> %s\n\tRange Length: %d\n\tProfit Rate Over Range: %.2f%%\n\tProfit Annualized (APR): %.2f%%",
+		"\n\tPool Address: %s\n\tTokens: %s <-> %s\n\tRange Length: %d\n\tProfit Over Range (Earned per $1 USD Deposited): %.2f%%\n\tProfit Annualized (APR): %.2f%%",
 		pool.Id,
 		pool.Token0Name,
 		pool.Token1Name,
 		pool.DayRangeStats.Length,
-		math.Round(pool.DayRangeStats.ProfitOverRange*10000)/float64(100),
+		pool.DayRangeStats.ProfitOverRange,
 		math.Round(pool.DayRangeStats.ProfitAnnualized*10000)/float64(100),
 	)
 }
