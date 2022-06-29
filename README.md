@@ -2,7 +2,7 @@
 Simple project to calculate the most profitable UniSwap v3 pool over a given time range.
 
 ## Testing
-Run `<repo root>/test.sh`.
+Run `<repo root>/test.sh` to run unit tests.
 
 ## Building
 Run `<repo root>/build.sh`. This will create the binary `most-profitable-pool` in `<repo root>/dist` subdirectory.
